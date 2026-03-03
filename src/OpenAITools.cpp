@@ -34,7 +34,7 @@ AFuture<AVector<OpenAIChat::Message>> OpenAITools::handleToolCalls(const AVector
                     if (auto c = mHandlers.contains(toolCall.function.name)) {
                         co_return co_await c->second.handler({*this, AJson::fromString(toolCall.function.arguments)});
                     }
-                    co_return "error: no such tool: " + toolCall.function.name;
+                    co_return "tool \"" + toolCall.function.name + "\" is not currently available. Please use another tool instead.";
                 } catch (const AException& e) {
                     co_return "error while executing \"{}\" tool: {}"_format(toolCall.function.name, e.getMessage());
                 }

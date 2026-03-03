@@ -52,7 +52,7 @@ AppBase::AppBase(): mWakeupTimer(_new<ATimer>(2h)) {
             self.mNotifications.pop();
             self.mTemporaryContext << OpenAIChat::Message{
                 .role = OpenAIChat::Message::Role::USER,
-                .content = std::move(notification.message),
+                .content = {},
             };
 
             for (auto it = self.mCachedDairy->begin(); it != self.mCachedDairy->end();) {
@@ -60,9 +60,10 @@ AppBase::AppBase(): mWakeupTimer(_new<ATimer>(2h)) {
                     ++it;
                     continue;
                 }
-                self.mTemporaryContext.last().content += "\n<kumi>\nAfter reading this notification, it reminded me my dairy page:\n" + *it + "\n</kumi>\n";
+                self.mTemporaryContext.last().content += "<your_dairy_page additional_context just_for_reasoning no_plagiarism no_copy>\n" + *it + "\n</your_dairy_page>\n";
                 it = self.mCachedDairy->erase(it);
             }
+            self.mTemporaryContext.last().content += notification.message;
 
             naxyi:
             OpenAIChat llm {
@@ -83,6 +84,7 @@ AppBase::AppBase(): mWakeupTimer(_new<ATimer>(2h)) {
             }
 
             self.mTemporaryContext << co_await notification.actions.handleToolCalls(botAnswer.choices.at(0).message.tool_calls);
+            ALOG_DEBUG(LOG_TAG) << "Tool call response: " << self.mTemporaryContext.last().content;
             AUI_ASSERT(AThread::current() == self.getThread());
             if (!notification.actions.handlers().empty()) {
                 self.mTemporaryContext.last().content += "\nWhat's your next action? Use a `tool` to act. The following tools available: " + AStringVector(notification.actions.handlers().keyVector()).join(", ");
@@ -123,24 +125,30 @@ AFuture<> AppBase::dairyDumpMessages() {
 
 void AppBase::actProactively() {
     static std::default_random_engine re(std::time(nullptr));
-    AString prompt;
+    AString prompt = "<your_dairy_page just_for_reasoning no_plagiarism no_copy>\n";
     if (!mCachedDairy->empty()) {
         auto entry = mCachedDairy->begin() + re() % mCachedDairy->size();
-        prompt = std::move(*entry);
+        prompt += *entry;
         mCachedDairy->erase(entry);
-        prompt += "\n\nYou opened a random diary page.\n\n";
     }
-    prompt += "It's time to reflect on your thoughts!\n"
-    " - maybe make some reasoning?\n"
-    " - maybe do some reflection?\n"
-    " - maybe write to a person and initiate a dialogue with #send_telegram_message?\n"
-    "Act proactively!";
+    prompt += R"(
+</your_dairy_page>
+
+It's time to reflect on your thoughts!
+  - maybe make some reasoning?\n"
+  - maybe do some reflection?\n"
+  - maybe write to a person and initiate a dialogue with #send_telegram_message?\n"
+Act proactively!
+)";
     passNotificationToAI(std::move(prompt));
 }
 
 AFuture<bool> AppBase::dairyEntryIsRelatedToCurrentContext(const AString& dairyEntry) {
     if (dairyEntry.empty()) {
         co_return false;
+    }
+    if (dairyEntry.contains("<important_note")) {
+        co_return true;
     }
     AString basePrompt = config::DAIRY_IS_RELATED_PROMPT;
     basePrompt += "\n<context>\n";
