@@ -14,6 +14,7 @@
 #include "AUI/View/AForEachUI.h"
 #include "AUI/View/AGroupBox.h"
 #include "AUI/View/AScrollArea.h"
+#include "AUI/View/ASpinnerV2.h"
 #include "AUI/View/AText.h"
 #include "AUI/View/ATextArea.h"
 
@@ -27,6 +28,7 @@ namespace {
         AProperty<AVector<Diary::EntryExAndRelatedness>> queriedEntries;
         AProperty<std::valarray<double>> queryEmbedding;
         AProperty<AString> aiQueryResponse;
+        AProperty<bool> isLoading = false;
         AFuture<> async;
 
         State() {
@@ -36,6 +38,8 @@ namespace {
         }
 
         AFuture<> updateQueriedEntries() {
+            isLoading = true;
+            AUI_DEFER { isLoading = false; };
             auto filter = [](const Diary::EntryEx& e) {
                 // if (e.id.startsWith("msg_")) {
                 //     return false;
@@ -152,6 +156,9 @@ _<AView> ui::debug::Diary::operator()() {
                   } AUI_OVERRIDE_STYLE { LayoutSpacing {4_dp } },
                 }).build() AUI_LET {
                     AObject::connect(AUI_REACT(!state->query->empty() ? Visibility::VISIBLE : Visibility::GONE), AUI_SLOT(it)::setVisibility);
+                },
+                _new<ASpinnerV2>() AUI_LET {
+                    AObject::connect(AUI_REACT(state->isLoading ? Visibility::VISIBLE : Visibility::GONE), AUI_SLOT(it)::setVisibility);
                 },
             },
         } AUI_OVERRIDE_STYLE { Expanding() },
