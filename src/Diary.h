@@ -97,7 +97,7 @@ public:
             /**
              * @brief Embedding vector used for similarity calculations.
              */
-            std::valarray<float> embedding;
+            std::valarray<double> embedding;
         } metadata;
 
         /**
@@ -121,9 +121,11 @@ public:
         std::list<EntryEx>::iterator entry;
 
         /**
-         * @brief Normalized similarity score between 0 and 1.
+         * @brief Normalized similarity score around 0 = unrelated and 1 = copypasta.
          */
-        aui::float_within_0_1 relatedness;
+        double relatedness{};
+
+        auto operator<=>(const EntryExAndRelatedness&) const = default;
     };
     
     /**
@@ -171,7 +173,7 @@ public:
      * [0,1], and returns a sorted vector of {@link EntryExAndRelatedness}
      * objects.
      */
-    AFuture<AVector<EntryExAndRelatedness>> query(const std::valarray<float>& query, QueryOpts opts);
+    AFuture<AVector<EntryExAndRelatedness>> query(const std::valarray<double>& query, QueryOpts opts);
 
     /**
      * @brief Compute the relatedness of a single entry to a context vector.
@@ -179,7 +181,7 @@ public:
      * If the entry does not yet have an embedding, it is generated via
      * {@link OpenAIChat::embedding} and persisted.
      */
-    AFuture<aui::float_within_0_1> entryIsRelated(const std::valarray<float>& context, EntryEx& entry, QueryOpts opts);
+    AFuture<double> entryIsRelated(const std::valarray<double>& context, EntryEx& entry, QueryOpts opts);
 
     /**
      * @brief Parse raw markdown entries into extended entries.

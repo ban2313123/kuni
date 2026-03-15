@@ -149,7 +149,7 @@ AFuture<OpenAIChat::Response> OpenAIChat::chat(AVector<Message> messages) {
     co_return aui::from_json<Response>(response);
 }
 
-AFuture<std::valarray<float>> OpenAIChat::embedding(AString input, AStringView embeddingModel) {
+AFuture<std::valarray<double>> OpenAIChat::embedding(AString input, AStringView embeddingModel) {
     auto response = AJson::fromBuffer((co_await ACurl::Builder(baseUrl + "v1/embeddings")
                                            .withMethod(ACurl::Method::HTTP_POST)
                                            .withTimeout(4h)
@@ -162,7 +162,7 @@ AFuture<std::valarray<float>> OpenAIChat::embedding(AString input, AStringView e
                                           .body);
     const auto& array = response["data"][0]["embedding"].asArray();
 
-    std::valarray result(0.f, array.size());
+    std::valarray result(0.0, array.size());
     for (const auto& [i, v]: array | ranges::view::enumerate) {
         result[i] = v.asNumber();
     }

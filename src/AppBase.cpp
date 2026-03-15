@@ -26,7 +26,7 @@ using namespace std::chrono_literals;
 static constexpr auto LOG_TAG = "App";
 
 
-AFuture<std::valarray<float>> contextEmbedding(ranges::range auto && rng) {
+AFuture<std::valarray<double>> contextEmbedding(ranges::range auto && rng) {
     AString basePrompt;
     AUI_ASSERT(!ranges::empty(rng));
     for (const auto& message: rng) {
@@ -112,7 +112,7 @@ AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_
                     // this will find common cues which are related to current conversation.
                     {
                         auto currentContext = co_await contextEmbedding(self.mTemporaryContext);
-                        auto relatednesses = co_await self.mDiary.query(currentContext, {});
+                        auto relatednesses = co_await self.mDiary.query(currentContext, {.confidenceFactor = 0.f});
 
                         for (const auto& i : relatednesses) {
                             const auto&[entryIt, relatedness] = i;
@@ -137,7 +137,7 @@ AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_
                     // this helps switching between unrelated contexts.
                     {
                         auto query = co_await contextEmbedding(self.mTemporaryContext | ranges::view::take_last(2));
-                        auto relatednesses = co_await self.mDiary.query(query, {});
+                        auto relatednesses = co_await self.mDiary.query(query, {.confidenceFactor = 0.f});
                         for (const auto& i : relatednesses) {
                             if (diary.length() > config::DIARY_INJECTION_MAX_LENGTH) {
                                 break;

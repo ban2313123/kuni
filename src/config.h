@@ -309,7 +309,7 @@ Use proper Markdown formatting in your answers.
     static constexpr auto DIARY_AVERAGE_ENTRY_SIZE = 1000;
     static constexpr auto DIARY_INJECTION_MAX_LENGTH = DIARY_AVERAGE_ENTRY_SIZE * 5;
     static constexpr auto DIARY_PLAGIARISM_THRESHOLD = 0.97f;
-    static constexpr auto DIARY_MIN_RELATEDNESS = 0.8;
+    static constexpr auto DIARY_MIN_RELATEDNESS = 0.8f;
 
     static constexpr auto TEMPERATURE = 0.2f; // средняя температура по больнице
 

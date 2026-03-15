@@ -52,10 +52,10 @@ void Diary::save(const EntryEx& entry) {
     });
 }
 
-AFuture<AVector<Diary::EntryExAndRelatedness>> Diary::query(const std::valarray<float>& query, QueryOpts opts) {
+AFuture<AVector<Diary::EntryExAndRelatedness>> Diary::query(const std::valarray<double>& query, QueryOpts opts) {
     struct DiaryEntryExAndRelatednessF {
         std::list<EntryEx>::iterator entry;
-        AFuture<aui::float_within_0_1> relatedness;
+        AFuture<double> relatedness;
     };
 
     AVector<DiaryEntryExAndRelatednessF> relatednesses;
@@ -77,23 +77,23 @@ AFuture<AVector<Diary::EntryExAndRelatedness>> Diary::query(const std::valarray<
     }) | ranges::to<AVector<EntryExAndRelatedness>>;
     ranges::sort(result, [](const auto& a, const auto& b) { return a.relatedness > b.relatedness; });
     // avoid returning results that equal to the query.
-    while (!result.empty()) {
-        auto& [i, relevance] = result.front();
-        if (relevance < 0.9999f) {
-            break;
-        }
-        result.erase(result.begin());
-    }
+    // while (!result.empty()) {
+    //     auto& [i, relevance] = result.front();
+    //     if (relevance < 0.9999f) {
+    //         break;
+    //     }
+    //     result.erase(result.begin());
+    // }
     co_return result;
 }
 
-AFuture<aui::float_within_0_1> Diary::entryIsRelated(const std::valarray<float>& context, EntryEx& entry, QueryOpts opts) {
+AFuture<double> Diary::entryIsRelated(const std::valarray<double>& context, EntryEx& entry, QueryOpts opts) {
     if (entry.freeformBody.empty()) {
-        co_return 0.f;
+        co_return 0.0;
     }
     if (entry.freeformBody.contains("<important_note")) {
-        entry.metadata.confidence = 1.f;
-        co_return 1.f;
+        entry.metadata.confidence = 1.0;
+        co_return 1.0;
     }
     if (entry.metadata.embedding.size() != context.size()) {
         OpenAIChat chat;
@@ -101,7 +101,7 @@ AFuture<aui::float_within_0_1> Diary::entryIsRelated(const std::valarray<float>&
         save(entry);
     }
     auto task = AUI_THREADPOOL_X [&] {
-        return aui::float_within_0_1((util::cosine_similarity(context, entry.metadata.embedding) + 1.f) / 2.f) + entry.metadata.confidence * opts.confidenceFactor;
+        return ((util::cosine_similarity(context, entry.metadata.embedding) + 1.0) / 2.0) + entry.metadata.confidence * opts.confidenceFactor;
     };
     co_return co_await task;
 }

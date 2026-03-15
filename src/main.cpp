@@ -16,6 +16,7 @@
 #include "AUI/Util/kAUI.h"
 #include "AppBase.h"
 #include "telegram/TelegramClient.h"
+#include "ui/debug/KuniDebugWindow.h"
 
 using namespace std::chrono_literals;
 
@@ -603,7 +604,7 @@ on them.
                         // verify that kuni does not repeat itself.
                         {
                             auto target = co_await OpenAIChat{}.embedding(message);
-                            static AMap<AString, std::valarray<float>> embeddings;
+                            static AMap<AString, std::valarray<double>> embeddings;
                             for (const auto& i : kuniMessages) {
                                 auto& embedding = embeddings[i];
                                 if (embedding.size() != target.size()) {
@@ -667,6 +668,12 @@ on them.
 
 
 AUI_ENTRY {
+    if (args.contains("--debug")) {
+        ALogger::info(LOG_TAG) << "--debug mode enabled; service is not running";
+        _new<KuniDebugWindow>()->show();
+        return 0;
+    }
+
     using namespace std::chrono_literals;
     auto app = _new<App>();
 

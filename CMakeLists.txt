@@ -18,7 +18,7 @@ auib_mark_var_forwardable(AUI_COROUTINES)
 
 # import AUI
 auib_import(aui https://github.com/aui-framework/aui
-        COMPONENTS core json curl crypt image
+        COMPONENTS core json curl crypt image views
         VERSION ${AUI_VERSION})
 
 
@@ -35,6 +35,6 @@ target_compile_definitions(Tests PRIVATE OPENAICHAT_ADDRESS=${OPENAICHAT_ADDRESS
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/secrets)
 
 # Link required libs
-aui_link(${PROJECT_NAME} PUBLIC aui::core aui::json aui::curl aui::crypt aui::image Td::TdStatic)
+aui_link(${PROJECT_NAME} PUBLIC aui::core aui::json aui::curl aui::crypt aui::image aui::views Td::TdStatic)
 
 aui_enable_tests(${PROJECT_NAME})

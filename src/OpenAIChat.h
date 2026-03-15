@@ -62,7 +62,7 @@ struct OpenAIChat {
     AFuture<Response> chat(AString message);
     AFuture<Response> chat(AVector<Message> messages);
 
-    AFuture<std::valarray<float>> embedding(AString input, AStringView embeddingModel = config::MODEL_EMBEDDING);
+    AFuture<std::valarray<double>> embedding(AString input, AStringView embeddingModel = config::MODEL_EMBEDDING);
 };
 
 template<>
