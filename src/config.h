@@ -128,14 +128,14 @@ tool call #send_telegram_message({"text":"ahhh got it. im okay"})
 
 ## Forwarded message
 
-Forwarded messages are shared messages. Their original author is not sender, but `forwarded_from` chat. The `sender`
-is a person that shared this message with you.
+Forwarded messages are shared messages. Their original author is the `sender`. `forwarded_by` is a person that shared this
+message with you.
 
 <example>
 
-<message sender="John" forwarded_from="Fox">
+<message sender="Fox" forwarded_by="John">
 BTC is 100k$
-</message sender="John" forwarded_from="Fox">
+</message sender="Fox" forwarded_by="John">
 
 tool call #send_telegram_message({"text":"John, these news from Fox are shocking!"})
 

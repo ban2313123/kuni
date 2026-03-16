@@ -233,14 +233,31 @@ namespace {
             }
             checkForMaliciousPayloads(senderName);
             AString formattedXmlTag = "{} message_id=\"{}\""_format(xmlTag, msg.id_);
-            if (!senderName.empty()) {
-                formattedXmlTag += " sender=\"{}\""_format(senderName);
-            }
             if (chat.last_read_outbox_message_id_ < msg.id_) {
                 formattedXmlTag += " unread";
             }
             if (msg.forward_info_) {
-                formattedXmlTag += " forwarded_from=\"";
+                // explanation: from perspective of telegram, sender is the one who shared a message to you.
+                //
+                // <message sender="John" forwarded_from="Fox News">
+                // btc is 100k$t
+                // </message>
+                //
+                // The message above means that a person named "John" forwarded a post from Fox News about btc hitting
+                // 100k$t.
+                //
+                // However, LLM doesn't seem care about `forwarded_from` attribute, and responds to you as if
+                // `btc is 100k$t` was authored by John.
+                //
+                // This branch solves this problem: we swap sender and forward authors:
+                //
+                // <message sender="Fox News" forwarded_by="John">
+                // btc is 100k$t
+                // </message>
+                //
+                // So the LLM knows that author of this post is Fox News and it was shared by John.
+                //
+                formattedXmlTag += " sender=\"";
                 auto forwardedFromChatId = [&] {
                     switch (msg.forward_info_->origin_->get_id()) {
                         case td::td_api::messageOriginChannel::ID:
@@ -259,7 +276,16 @@ namespace {
                     } catch (const AException& e) {}
                 }
                 formattedXmlTag += "\"";
+
+                if (!senderName.empty()) {
+                    formattedXmlTag += " forwarded_by=\"{}\""_format(senderName);
+                }
+            } else {
+                if (!senderName.empty()) {
+                    formattedXmlTag += " sender=\"{}\""_format(senderName);
+                }
             }
+
             auto result = "<{}>\n"_format(formattedXmlTag);
             if (xmlTag != "reply_to") {
                 if (msg.reply_to_ && msg.reply_to_->get_id() == td::td_api::messageReplyToMessage::ID) {
