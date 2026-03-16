@@ -208,7 +208,8 @@ const AFuture<>& AppBase::passNotificationToAI(AString notification, OpenAITools
 }
 
 AFuture<> AppBase::diaryDumpMessages() {
-    mDiary.reload(); // will find plagiarism against all entries.
+    // mDiary.reload(); // will find plagiarism against all entries. // commented out: exclude plagiarism checks for
+    // included entries
     AUI_DEFER { mDiary.reload(); };
     if (mTemporaryContext.empty()) {
         co_return;
