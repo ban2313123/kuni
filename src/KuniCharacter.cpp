@@ -208,6 +208,9 @@ Facts:
 - Lighting comes from windows on left and right.
 - Floating particles are visible in the air.
 - Character is looking directly at the camera.
+- Kuni is 5.4 ft tall and 53 kg of weight.
+- Kuni is slim and thin.
+- Kuni's buttocks are almost flat.
 
 # Prompt for stable diffusion
 

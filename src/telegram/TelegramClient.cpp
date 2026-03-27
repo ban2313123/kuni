@@ -31,14 +31,14 @@ AFuture<TelegramClient::Object> TelegramClient::sendQuery(td::td_api::object_ptr
         // trigger their security leading to ban of the account.
         //
         // If the application starts to SPAM with queries, we simply crash it.
-        throw AException("too many queries");
+        co_await AThread::asyncSleep(10s);
     }
 
     auto query_id = ++mCurrentQueryId;
     AFuture<TelegramClient::Object> result;
     mHandlers.emplace(query_id, [result](Object object) { result.supplyValue(std::move(object)); });
     mClientManager->send(mClientId, query_id, std::move(f));
-    return result;
+    co_return co_await result;
 }
 
 void TelegramClient::initClientManager() {
