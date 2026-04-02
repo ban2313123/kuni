@@ -9,13 +9,14 @@
 #include <range/v3/view/transform.hpp>
 #include <range/v3/range/conversion.hpp>
 #include <range/v3/view/filter.hpp>
+#include <range/v3/view/reverse.hpp>
 
 #include "OpenAIChat.h"
 #include "AUI/Image/png/PngImageLoader.h"
 #include "AUI/IO/AFileInputStream.h"
 
 static constexpr auto LOG_TAG = "ImageGenerator";
-static constexpr auto TRIAL_COUNT = 20;
+static constexpr auto TRIAL_COUNT = 10;
 
 static AJson parseResponse(AString content) {
     // Basic JSON extraction if the model wrapped it in markdown
@@ -27,7 +28,7 @@ static AJson parseResponse(AString content) {
     return AJson::fromString(content);
 }
 
-AFuture<_<AImage>> ImageGenerator::generate(AString description) {
+AFuture<ImageGenerator::GalleryImage> ImageGenerator::generate(AString description) {
     AString appearancePrompt = kuni_character::getAppearancePrompt();
     int trialIndex = 0;
 
@@ -56,7 +57,7 @@ AFuture<_<AImage>> ImageGenerator::generate(AString description) {
                         .prompt = currentPrompt.positive,
                         .negative_prompt = currentPrompt.negative,
                         .steps =  30,
-                        .cfg_scale = std::uniform_real_distribution<>(1.0, 7.0)(ge),
+                        .cfg_scale = std::uniform_real_distribution<>(1.0, 5.0)(ge),
                         .width = std::uniform_int_distribution<>(768, 1400)(ge),
                         .height = std::uniform_int_distribution<>(768, 1400)(ge),
                     });
@@ -78,7 +79,7 @@ AFuture<_<AImage>> ImageGenerator::generate(AString description) {
                     auto dst = APath("data/gallery/{}.png"_format(std::chrono::system_clock::now()));
                     dst.parent().makeDirs();
                     PngImageLoader::save(AFileOutputStream{ dst }, *lastImage);
-                    co_return lastImage;
+                    co_return GalleryImage{ .image = lastImage, .path = dst.absolute() };
                 }
                 if (firstFeedback.empty()) {
                     firstFeedback = assessment.feedback;
@@ -117,7 +118,23 @@ AFuture<_<AImage>> ImageGenerator::generate(AString description) {
     throw AException("can't find image: feedback: \"{}\"; make photo_desc shorter"_format(firstFeedback));
 }
 
+static constexpr auto LOL_WHAT = {
+    "explicit nudity",
+    "explicit nude",
+    "explicit erotic",
+    "pussy",
+    "breasts",
+    "nsfw",
+    "genital",
+    "vagina",
+    "penis",
+};
+
 AFuture<> ImageGenerator::engineerPrompt(PromptPair& out, const AString& description, const AString& appearancePrompt, const AString& feedback) {
+    auto safeDescription = description;
+    for (const auto& word : LOL_WHAT) {
+        safeDescription.replaceAll(word, "");
+    }
     OpenAIChat chat = mChatClient;
     chat.systemPrompt = R"(
 You are an expert Stable Diffusion prompt engineer.
@@ -152,7 +169,7 @@ Respond in JSON object format with the following fields:
 - "positivePrompt": string, positive prompt
 - "negativePrompt": string, negative prompt
 
-)"_format(appearancePrompt, description);
+)"_format(appearancePrompt, safeDescription);
 
     auto messages = [&] {
         AString message;
@@ -226,6 +243,14 @@ Negative prompt is what to avoid in the image.
             goto naxyi;
         }
     }
+
+    for (const auto& badWord : LOL_WHAT) {
+        if (description.contains(badWord)) {
+            out.positive += " ";
+            out.positive += badWord;
+        }
+    }
+
 
     co_return;
 }

@@ -111,7 +111,9 @@ struct AJsonConv<AVector<OpenAIChat::Message>> {
 
 AString OpenAIChat::embedImage(AImageView image) {
     AByteBuffer jpg;
-    JpgImageLoader::save(jpg, image);
+    auto resized = image.resizedLinearDownscale({672, 672});
+    JpgImageLoader::save(jpg, resized);
+    // JpgImageLoader::save(AFileOutputStream("test.jpg"), resized);
     return "<{}>data:image/jpg;base64,{}</{}>"_format(EMBEDDING_TAG, jpg.toBase64String(), EMBEDDING_TAG);
 }
 
@@ -124,7 +126,7 @@ AFuture<OpenAIChat::Response> OpenAIChat::chat(AVector<Message> messages) {
             aui::to_json(messages),
         },
         { "options", AJson::Object{
-            {"num_predict", config::DIARY_TOKEN_COUNT_TRIGGER } // hopefully helps with stuck prediction (infinite reasoning)
+            {"num_predict", numPredict } // hopefully helps with stuck prediction (infinite reasoning)
         } },
         {"stream", false},
         {"use_context", false},
@@ -157,7 +159,11 @@ AFuture<OpenAIChat::Response> OpenAIChat::chat(AVector<Message> messages) {
     AFileOutputStream("last_response.json") << response;
     AFileOutputStream(logsDir / "{}.1response.json"_format(now)) << response;
     ALOG_TRACE(LOG_TAG) << "Response: " << AJson::toString(response);
-    co_return aui::from_json<Response>(response);
+    auto responseResult = aui::from_json<Response>(response);
+    if (!responseResult.choices.empty() && !ALogger::global().isTrace()) {
+        ALOG_DEBUG(LOG_TAG) << "Response reasoning: " << responseResult.choices.at(0).message.reasoning_content << responseResult.choices.at(0).message.reasoning;
+    }
+    co_return responseResult;
 }
 
 AFuture<std::valarray<double>> OpenAIChat::embedding(AString input) {

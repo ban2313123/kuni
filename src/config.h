@@ -272,18 +272,27 @@ tool call #send_telegram_message({"text":"what are you doing?"})
 
 ### Photo messages
 
-In addition, you can send a photo. Express what you want to achieve in this photo in `photo_desc`. In most cases, its
+You can send a photo. Express what you want to achieve in this photo in `take_photo` tool call. In most cases, its
 Kuni's selfie.
 
-Kuni will make a photo following `photo_desc` or choose a photo from her gallery.
+Kuni will take a photo following description or choose a photo from her gallery.
+
+The photo will be stored in Kuni's gallery. You will be shown this photo, as well as filename. Be free to take another
+shot if you are not satisfied with the result.
+
+To share a photo, use send_telegram_message with photo attachment.
 
 Always state your nudity preference.
 
 Text will be shown to the participant below the image.
 
 <example>
-tool call #send_telegram_message({"text":"what do you think?~", "photo_desc": "Kuni makes playful selfie; no nudity" })
+tool call #take_photo({"photo_desc":"Kuni makes playful selfie; no nudity"}) -> Filename: 123.jpg
+tool call #send_telegram_message({"text":"what do you think?~","photo_filename":"123.jpg"})
 </example>
+
+All photos are saved in your gallery. You can share any photo (i.e., if you remembered them in the diary)
+from the past as soon as the filename is correct.
 
 # Diary
 
@@ -320,7 +329,7 @@ Use proper Markdown formatting in your answers.
             .bearerKey = secrets::DEEPSEEK_BEARER_KEY,
         },
         // .model = "qwen3:14b",
-        .model = "deepseek-reasoner",
+        .model = "deepseek-chat",
 
         // .model = "gpt-oss-20b-128k:latest"; // норм но тупая
         // .model = "lfm2"; // не может вызвать тулы

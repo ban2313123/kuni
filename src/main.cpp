@@ -76,6 +76,29 @@ namespace {
 
         void updateTools(OpenAITools& actions) override {
             actions.insert({
+                .name = "take_photo",
+                .description = "Takes a photo by Kuni. This tool is useful for creating selfies, photos of surroundings, or any other images. "
+                               "The result of this tool is a photo description and a filename. "
+                               "The filename can then be sent to someone else using #send_telegram_message.",
+                .parameters =
+                    {
+                        .properties =
+                            {
+                                {"photo_desc", {.type = "string", .description = "Describes the image Kuni would like to achieve. Refer to yourself as Kuni. Avoid unnecessary details. Instead of specifying complex composition, prefer setting vibe of the image. Example: \"Kuni makes playful selfie\""}},
+                            },
+                        .required = {"photo_desc"},
+                    },
+                .handler = [this](OpenAITools::Ctx ctx) -> AFuture<AString> {
+                    auto photoDesc = ctx.args["photo_desc"].asStringOpt().valueOrException("photo_desc is required");
+                    auto galleryImage = co_await ImageGenerator{StableDiffusionClient{}, OpenAIChat{.config = config::ENDPOINT_PHOTO_TO_TEXT, .numPredict = 1000 }}.generate(photoDesc);
+                    auto description = co_await describePhoto(galleryImage.path);
+
+                    co_return "{}\n\nFilename: {}\n"
+                    "When writing diary, do not forget to mention this photo and its filename verbatim - you might need this in the future!\n\n"
+                    "You have created photo successfully. Review it carefully. Send it only if you are fully satisfied; use take_photo again to make another photo"_format(description, galleryImage.path.filename());
+                },
+            });
+            actions.insert({
                 .name = "get_telegram_chats",
                 .description = "Returns a list of Telegram chats. Use this to seek chat_ids, looking for existing "
                                "chats and unread chats, or to start a new conversation.",
@@ -659,10 +682,10 @@ on them.
                         {
                             .properties =
                                 {
-                                    {"text", {.type = "string", .description = "Contents of the message"}},
-                                    {"photo_desc", {.type = "string", .description = "Adds a photo made by Kuni. This field describes the image Kuni would like to achieve. Refer to yourself as Kuni. Avoid unnecessary details. Example: \"Kuni makes playful selfie\""}},
+                                    {"text", {.type = "string", .description = "Text of the message. May not be specified if photo_filename is set"}},
+                                    {"photo_filename", {.type = "string", .description = "Attaches a photo with the given filename. Filename can be obtained by #take_photo tool; althrough you can attach any file as soon as their filename is correct."}},
                                 },
-                            .required = {"text"},
+                            .required = {},
                         },
                     .handler = [this, chat, chatEmbedding = std::move(chatEmbedding), messagesInRow = _new<int>(0), kuniMessages = std::move(kuniMessages)](OpenAITools::Ctx ctx) -> AFuture<AString> {
                         if (*messagesInRow > 10) {
@@ -671,10 +694,10 @@ on them.
                         }
                         const auto& object = ctx.args.asObjectOpt().valueOrException("object expected");
                         auto message = object["text"].asStringOpt().valueOr("");
-                        auto photoDesc = ctx.args["photo_desc"].asStringOpt().valueOr("");
+                        auto photoFilename = ctx.args["photo_filename"].asStringOpt().valueOr("");
 
-                        if (message.empty() && photoDesc.empty()) {
-                            throw AException("At least \"text\" or \"photo_desc\" must be populated");
+                        if (message.empty() && photoFilename.empty()) {
+                            throw AException("At least \"text\" or \"photo_filename\" must be populated");
                         }
 
                         if (message.contains("\n\n")) {
@@ -693,7 +716,10 @@ on them.
                         // - LLM does not copypaste its prior responses
                         // - LLM inclined to switch topics or respond nothing "if it has nothing to say", which is more
                         //   natural.
-                        if (!message.empty()) {
+                        //
+                        // dirty fix: skip similarity checks if a photo was attached: llm's comment on photo is not much
+                        // important
+                        if (!message.empty() && photoFilename.empty()) {
                             auto target = co_await OpenAIChat{.config = config::ENDPOINT_EMBEDDING}.embedding(message);
                             static AMap<AString, std::valarray<double>> embeddings;
                             double maxSimilarity = 0.0;
@@ -724,7 +750,15 @@ on them.
                                 if (similiarity > config::REPEAT_YOURSELF_TRIGGER_MAX) {
                                     ALogger::warn(LOG_TAG) << "LLM is repeating itself: (maxSimilarity=" << maxSimilarity << ")" << message;
                                     co_await injectFirstDiaryEntry();
-                                    co_return "<{} />"_format(OpenAIChat::EMBEDDING_TAG);
+                                    static std::default_random_engine re(std::time(nullptr));
+                                    if (std::uniform_real_distribution<>(0.0, 1.0)(re) < 0.6) {
+                                        // <kuni_embedding /> will be interpreted by core as "remove the latest LLM response"
+                                        // this way LLM has no clue what did it sent; maybe more creative
+                                        // however it might go in infinite loop; this is why we have alternative
+                                        // path with throwing an exception
+                                        co_return "<{} />"_format(OpenAIChat::EMBEDDING_TAG);
+                                    }
+                                    throw AException("You are repeating yourself. Please rephrase");
                                 }
                             }
                             avgSimilarity /= kuniMessages.size();
@@ -764,10 +798,16 @@ on them.
                         co_await AThread::asyncSleep((message.length() + 1) * dist(re) * 1ms);
 
 
-                        // handle photo_desc
+                        // handle photo_filename
                         AOptional<_<AImage>> photo;
-                        if (!photoDesc.empty()) {
-                            photo = co_await ImageGenerator{StableDiffusionClient{}, OpenAIChat{.config = config::ENDPOINT_PHOTO_TO_TEXT}}.generate(photoDesc);
+                        if (!photoFilename.empty()) {
+                            if (photoFilename.contains("/")) {
+                                throw AException("Invalid photo filename: \"{}\". Filename must not contain \"/\". ");
+                            }
+                            if (photoFilename.contains("..")) {
+                                throw AException("Invalid photo filename: \"{}\". Filename must not contain \"..\". ");
+                            }
+                            photo = AImage::fromBuffer(AByteBuffer::fromStream(AFileInputStream(APath("data") / "gallery" / photoFilename)));
                         }
 
                         // actually send a message. we don't really need to wait until tdlib reports message sent

@@ -16,6 +16,8 @@ struct OpenAIChat {
     static constexpr auto EMBEDDING_TAG = "kuni_embedding";
     static AString embedImage(AImageView image);
 
+    int numPredict = config::DIARY_TOKEN_COUNT_TRIGGER / 10;
+
 
     struct Message {
         enum class Role {

@@ -18,7 +18,7 @@ TEST(ImageGenerator, Generate)
         ImageGenerator generator(sdClient, chatClient);
 
         try {
-            auto image = co_await generator.generate("Kuni makes a light erotic selfie");
+            auto image = (co_await generator.generate("Kuni makes a selfie")).image;
             EXPECT_NE(image, nullptr);
             PngImageLoader::save(AFileOutputStream{ "out_generator.png" }, *image);
             EXPECT_GT(image->width(), 0);
