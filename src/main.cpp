@@ -75,6 +75,7 @@ namespace {
         }
 
         void updateTools(OpenAITools& actions) override {
+            AppBase::updateTools(actions);
             actions.insert({
                 .name = "take_photo",
                 .description = "Takes a photo by Kuni. This tool is useful for creating selfies, photos of surroundings, or any other images. "
@@ -168,6 +169,11 @@ namespace {
             }
             auto chat = co_await mTelegram->sendQueryWithResult(
                 td::td_api::make_object<td::td_api::getChat>(u.message_->chat_id_));
+            if (chat->notification_settings_) {
+                if (chat->notification_settings_->mute_for_ > 0) {
+                    co_return;
+                }
+            }
             auto notification = "<notification chat_id=\"{}\">\n"_format(chat->id_);
             ;
             if (userId == u.message_->chat_id_) {
@@ -875,7 +881,7 @@ AUI_ENTRY {
         co_await app->telegram()->waitForConnection();
         ALogger::info(LOG_TAG) << "Connected to Telegram";
 
-        app->actProactively(); // for tests
+        // app->actProactively(); // for tests
     }(app);
 
     IEventLoop::Handle h(&gEventLoop);

@@ -361,7 +361,7 @@ Use proper Markdown formatting in your answers.
     static constexpr auto DIARY_TOKEN_COUNT_TRIGGER = 20000;
     static constexpr auto DIARY_AVERAGE_ENTRY_SIZE = 1000;
     static constexpr auto DIARY_INJECTION_MAX_LENGTH = DIARY_AVERAGE_ENTRY_SIZE * 5;
-    static constexpr auto DIARY_SLEEP_MAX_LENGTH = DIARY_AVERAGE_ENTRY_SIZE * 15;
+    static constexpr auto DIARY_SLEEP_MAX_LENGTH = DIARY_AVERAGE_ENTRY_SIZE * 50;
     static constexpr auto DIARY_PLAGIARISM_THRESHOLD = 0.97f;
     static constexpr auto DIARY_MIN_RELATEDNESS = 0.8f;
 

@@ -39,7 +39,7 @@ protected:
     /**
      * @brief Adds always available actions
      */
-    virtual void updateTools(OpenAITools& actions) {}
+    virtual void updateTools(OpenAITools& actions);
 
     /**
      * @brief Removes notifications by the given substring.

@@ -1,13 +1,12 @@
 #include "OpenAIChat.h"
 #include <gmock/gmock.h>
 
+#include "common.h"
 #include "AUI/Thread/AAsyncHolder.h"
 #include "AUI/Thread/AEventLoop.h"
 #include "OpenAITools.h"
 #include "config.h"
 #include "util/cosine_similarity.h"
-
-static const auto TEST_DATA = APath(__FILE__).parent() / "data";
 
 static constexpr auto SYSTEM_PROMPT = R"(
 You are an expert AI programming assistant, working with a user in the VS Code editor.

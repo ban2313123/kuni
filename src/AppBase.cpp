@@ -227,7 +227,7 @@ AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_
                     continue;
                 }
                 if (!notification.actions.handlers().empty()) {
-                    self.mTemporaryContext.last().content += "\nWhat's your next action? Use a `tool` to act. The following tools available: " + AStringVector(notification.actions.handlers().keyVector()).join(", ");
+                    self.mTemporaryContext.last().content += "\nWhat's your next action? Use a `tool` to act. Use #ask_diary to consult with your knowledge database. The following tools available: " + AStringVector(notification.actions.handlers().keyVector()).join(", ");
                 }
                 if (ranges::any_of(botAnswer.choices.at(0).message.tool_calls, [](const OpenAIChat::Message::ToolCall& t){ return t.function.name == "send_telegram_message"; })) {
                     goto naxyi_preserve_ctx;
@@ -333,6 +333,27 @@ Act proactively!
     passNotificationToAI(std::move(prompt));
 }
 
+
+void AppBase::updateTools(OpenAITools& actions) {
+    actions.insert({
+        .name = "ask_diary",
+        .description = "Consult with Kuni's main knowledge database",
+        .parameters = {
+            .properties =
+                {
+                    {"query", {.type = "string", .description = "Freeform question to diary. Provide as much context as possible."}},
+                },
+            .required = {"query"},
+        },
+        .handler = [this](OpenAITools::Ctx ctx) -> AFuture<AString> {
+            auto query = ctx.args["query"].asStringOpt().valueOrException("\"query\" string is required");
+            if (query.length() < 150) {
+                throw AException("too short query! provide more context!");
+            }
+            co_return (co_await mDiary.queryAI(query, {.confidenceFactor = 0.f})) + "\nIf response above is dismissive, try rephrasing your query and include other details";
+        },
+    });
+}
 
 void AppBase::removeNotifications(const AString& substring) {
     std::queue<Notification> remaining;

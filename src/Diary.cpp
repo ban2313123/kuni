@@ -15,6 +15,8 @@
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/transform.hpp>
 
+#include "OpenAITools.h"
+
 using namespace std::chrono_literals;
 
 Diary::Diary(APath diaryDir)
@@ -80,7 +82,10 @@ AFuture<AVector<Diary::EntryExAndRelatedness>> Diary::query(const std::valarray<
             .relatedness = *f.relatedness,
         };
     }) | ranges::to<AVector<EntryExAndRelatedness>>;
-    ranges::sort(result, [](const auto& a, const auto& b) { return a.relatedness > b.relatedness; });
+    auto maxEntryCountCappedIt = result.begin() + std::min(opts.maxEntryCount, result.size());
+    ranges::partial_sort(result, maxEntryCountCappedIt, [](const auto& a, const auto& b) { return a.relatedness > b.relatedness; });
+    result.erase(maxEntryCountCappedIt, result.end());
+    AUI_ASSERT(result.size() <= opts.maxEntryCount);
     // avoid returning results that equal to the query.
     // while (!result.empty()) {
     //     auto& [i, relevance] = result.front();
@@ -256,29 +261,84 @@ AFuture<> Diary::sleepingConsolidation() {
 }
 
 AFuture<AString> Diary::queryAI(const AString& query, QueryOpts opts) {
+    ALOG_DEBUG("Diary") << "queryAI query=\"" << query << "\"";
+    OpenAITools tools {
+        OpenAITools::Tool {
+            .name = "query",
+            .description = "Perform embedding-based search on RAG database",
+            .parameters = {
+                .properties = {
+                    {"text", {.type = "string", .description =
+                        "Retrieval cue that is likely to appear in memory pieces. This text will be transformed to "
+                        "embedding as is, and its embedding will be compared against memory pieces. Include as many"
+                        "keywords as possible; maintain meaning of the request."
+                    }},
+                },
+                .required = {"text"},
+            },
+            .handler = [this, opts](OpenAITools::Ctx ctx) -> AFuture<AString> {
+                auto cue = ctx.args["text"].asStringOpt().valueOrException("text is required string");
+                auto diaryResponse = co_await this->query(co_await OpenAIChat{.config = config::ENDPOINT_EMBEDDING}.embedding(cue), opts);
+                AString formattedResponse;
+                ALOG_DEBUG("Diary") << "queryAI cue=\"" << cue << "\" found=" << (diaryResponse | ranges::view::transform([](const EntryExAndRelatedness& e) {
+                    return "({}.md,relatedness={})"_format(e.entry->id, e.relatedness);
+                }));
+                for (const auto& i : diaryResponse) {
+                    formattedResponse += R"(<memory_piece relatedness="{}">
+{}
+</memory_piece>
+)"_format(i.relatedness, i.entry->freeformBody);
+                }
+                if (formattedResponse.empty()) {
+                    co_return "No data was found";
+                }
+                co_return formattedResponse;
+            },
+        },
+    };
     OpenAIChat chat {
         .systemPrompt = R"(
 You are a database searcher and summarizer.
 
-The user prompts a series of memory pieces separated by markdown line. Your job is to output data that fully satisfies
-user's query and would be helpful.
+The user asks you a question. Your job is to retrieve data solely from #query tool. Your job is to output data that
+fully satisfies user's query and would be helpful.
+
+Also, please include additional details that does not necessarily address the question (i.e., dates, names, events) but
+might be helpful to improve quality of subsequent processing of your response.
 
 Do not alter facts.
 
 Do not make up facts. Rely exclusively on provided context.
 )",
+        .tools = tools.asJson(),
     };
-    auto result = co_await this->query(co_await chat.embedding(query), std::move(opts));
-    AString body;
-    for (const auto&[i, relatedness] : result) {
-        body += i->freeformBody;
-        body += "\n\n---\n\n";
-        if (body.length() >= config::DIARY_INJECTION_MAX_LENGTH) {
-            break;
+
+    AVector<OpenAIChat::Message> messages = {
+        OpenAIChat::Message {
+            .role = OpenAIChat::Message::Role::USER,
+            .content = query,
+        },
+    };
+
+    bool toolCallHappened = false;
+
+    for (;;) {
+        auto botAnswer = (co_await chat.chat(messages)).choices.at(0).message;
+        messages << botAnswer;
+        if (botAnswer.tool_calls.empty()) {
+            if (!toolCallHappened) {
+                ALogger::warn("Diary") << "queryAI: no tool call happened, pointing that out to the LLM and trying again";
+                messages << OpenAIChat::Message {
+                    .role = OpenAIChat::Message::Role::USER,
+                    .content = "you must perform at least one call to #query",
+                };
+                continue;
+            }
+            co_return botAnswer.content;
         }
+        toolCallHappened = true;
+        auto toolCalls = co_await tools.handleToolCalls(botAnswer.tool_calls);
+        messages << toolCalls;
     }
-    body += "\nQuery:\n";
-    body += query;
-    co_return (co_await chat.chat(body)).choices.at(0).message.content;
 }
 

@@ -161,7 +161,8 @@ public:
     void unload(std::list<EntryEx>::const_iterator it);
 
     struct QueryOpts {
-        aui::float_within_0_1 confidenceFactor = 0.2f;
+        aui::float_within_0_1 confidenceFactor = 0.01f;
+        size_t maxEntryCount = 10;
         std::function<bool(const EntryEx&)> filter = [](const EntryEx&) { return true; };
     };
 
