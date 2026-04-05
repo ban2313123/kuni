@@ -305,6 +305,7 @@ AFuture<> Diary::sleepingConsolidation() {
 
 AFuture<AString> Diary::queryAI(const AString& query, QueryOpts opts) {
     ALOG_DEBUG("Diary") << "queryAI query=\"" << query << "\"";
+    ASet<AString> includedIds;
     OpenAITools tools {
         OpenAITools::Tool {
             .name = "query",
@@ -319,20 +320,30 @@ AFuture<AString> Diary::queryAI(const AString& query, QueryOpts opts) {
                 },
                 .required = {"text"},
             },
-            .handler = [this, opts](OpenAITools::Ctx ctx) -> AFuture<AString> {
+            .handler = [this, opts, &includedIds](OpenAITools::Ctx ctx) -> AFuture<AString> {
                 auto cue = ctx.args["text"].asStringOpt().valueOrException("text is required string");
                 auto diaryResponse = co_await this->query(co_await OpenAIChat{.config = config::ENDPOINT_EMBEDDING}.embedding(cue), opts);
                 AString formattedResponse;
-                ALOG_DEBUG("Diary") << "queryAI cue=\"" << cue << "\" found=" << (diaryResponse | ranges::view::transform([](const EntryExAndRelatedness& e) {
+                ALOG_DEBUG("Diary") << "queryAI cue=\"" << cue << "\" found=" << (diaryResponse | ranges::view::transform([&](const EntryExAndRelatedness& e) -> AString {
+                    if (includedIds.contains(e.entry->id)) {
+                        return "";
+                    }
                     return "({}.md,relatedness={})"_format(e.entry->id, e.relatedness);
                 }));
                 for (const auto& i : diaryResponse) {
+                    if (includedIds.contains(i.entry->id)) {
+                        continue;
+                    }
+                    includedIds << i.entry->id;
                     formattedResponse += R"(<memory_piece relatedness="{}">
 {}
 </memory_piece>
 )"_format(i.relatedness, i.entry->freeformBody);
                 }
                 if (formattedResponse.empty()) {
+                    if (!diaryResponse.empty()) {
+                        co_return "All memory pieces conforming your query were provided already. Use other query.";
+                    }
                     co_return "No data was found";
                 }
                 co_return formattedResponse;
