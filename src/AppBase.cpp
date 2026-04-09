@@ -23,6 +23,8 @@
 #include "WebSearch.h"
 #include "util/cosine_similarity.h"
 
+static std::default_random_engine re(std::time(nullptr));
+
 using namespace std::chrono_literals;
 
 static constexpr auto LOG_TAG = "App";
@@ -47,7 +49,7 @@ AFuture<std::valarray<double>> contextEmbedding(ranges::range auto && rng) {
     return chat.embedding(basePrompt);
 }
 
-AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_new<ATimer>(2h)) {
+AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_new<ATimer>(200min)) {
     // mTools.addTool({
     //     .name = "send_telegram_message",
     //     .description = "Sends a message to a Telegram user.",
@@ -66,12 +68,28 @@ AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_
     //     co_return "Message sent successfully.";
     // });
 
-    connect(mWakeupTimer->fired, me::actProactively);
+    connect(mWakeupTimer->fired, [this] {
+        if (std::uniform_real_distribution<double>(0.0, 1.0)(re) < 0.5) {
+            return;
+        }
+        actProactively();
+    });
     mWakeupTimer->start();
 
     mAsync << [](AppBase& self) -> AFuture<> {
         // co_await self.mDiary.sleepingConsolidation();
         for (;;) {
+            {
+                if (std::uniform_real_distribution(0.0, 1.0)(re) < 0.2) {
+                    // 1. randomly go afk is humane
+                    // 2. reduce resource usage:
+                    //    - less conversations would be made
+                    //    - in case of group chats and telegram channels, messages would be processed in batches
+                    const auto minutes = std::uniform_int_distribution(15, 120)(re);
+                    ALogger::info(LOG_TAG) << "Going to sleep for " << minutes << " minutes";
+                    co_await AThread::asyncSleep(1min * minutes);
+                }
+            }
             AUI_ASSERT(AThread::current() == self.getThread());
             if (self.mNotifications.empty()) {
                 co_await self.mNotificationsSignal;
@@ -82,6 +100,7 @@ AppBase::AppBase(APath workingDir): mDiary(workingDir / "diary"), mWakeupTimer(_
                 continue;
             }
             auto notification = std::move(self.mNotifications.front());
+            notification.message += "\nCurrent time: {}"_format(std::chrono::system_clock::now());
             AUI_DEFER { notification.onProcessed.supplyValue(); };
             try {
                 self.mNotifications.pop();
@@ -311,7 +330,6 @@ AFuture<> AppBase::diaryDumpMessages() {
 }
 
 void AppBase::actProactively() {
-    static std::default_random_engine re(std::time(nullptr));
     AString prompt = "<your_diary_page just_for_reasoning no_plagiarism no_copy>\n";
     if (!mDiary.list().empty()) {
         auto idx = re() % mDiary.list().size();
