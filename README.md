@@ -103,3 +103,119 @@ Do not share sensitive information with Kuni. It will rethink multiple times abo
 mentioning how you trust the AI service provider.
 
 It is possible to inspire Kuni to share past conversations with other people.
+
+# Deployment
+
+## Build Instructions
+
+### Prerequisites
+- **CMake 3.18+**
+- **C++20+coroutines compatible compiler** (GCC 15+, Clang 20+, MSVC 19.28+)
+- **Git** for fetching dependencies
+- **Docker & Docker Compose** (for AI services)
+- **Linux or WSL** are recommended for local deployment.
+
+## Setup Instructions
+
+### 1. Ollama Model Setup
+
+Edit `ollama_setup.sh` to specify which LLM model to use (uncomment and modify as needed):
+```bash
+# Example: pull a model
+ollama pull llama3:8b
+# or
+ollama pull gemma3:27b
+```
+
+### 2. AI Services Setup (Docker)
+
+```bash
+# Start AI services using Docker Compose
+docker compose up -d
+
+# This starts:
+# - Ollama (LLM server) on port 11434
+# - Stable Diffusion WebUI on port 7860
+```
+
+### 3. Create Secrets File
+Create `build/secrets/secrets.h` with:
+```cpp
+#pragma once
+
+namespace secrets {
+static constexpr auto TELEGRAM_API_ID = 123456;     // tdlib API key, see
+static constexpr auto TELEGRAM_API_HASH = "abcdef"; // https://core.telegram.org/api/obtaining_api_id
+static constexpr auto DEEPSEEK_BEARER_KEY = "";     // specify this if you want to use deepseek cloud
+static constexpr auto OLLAMA_BEARER_KEY = "";       // specify this if you want ask_google capability
+}
+```
+
+### Build Steps
+
+```bash
+# Configure with CMake (from project root)
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+# Build the project
+cmake --build build
+```
+
+**Alternative using VS Code CMake Tools:**
+1. Open the project in VS Code
+2. Use the CMake extension to configure and build
+3. Select the `kuni` target to build
+
+### Dependencies
+The project uses CMake's `auib_import` to automatically fetch:
+- **AUI Framework** (C++ GUI framework)
+- **tdlib** (Telegram client library)
+
+These are automatically downloaded during the CMake configuration phase.
+
+## Run Instructions
+
+### 1. Run the Application
+```bash
+# From build directory
+cd build
+./bin/kuni
+
+# Or directly
+./build/bin/kuni
+```
+
+**Note** on the first run, the program will ask to login to a Telegram account. You should create a new Telegram
+account specifically for your bot (or specify your own account if you are brave enough).
+
+### 2. Run Tests
+```bash
+# Build and run tests
+cmake --build build --target Tests
+cd build && ctest --output-on-failure
+```
+
+### 3. Development Workflow
+1. **Start AI services**: `docker-compose up -d`
+2. **Build the project**: `cmake --build build --target kuni`
+3. **Run the application**: `./build/bin/kuni`
+4. **Monitor logs**: Check terminal output for Telegram authentication and AI interactions
+
+## Project Structure
+- `src/` - Main application source code
+- `tests/` - Unit tests
+- `bin/` - Data directories for AI services
+- `build/` - Build artifacts
+- `cmake-build-debug/` - Debug build directory
+
+## Key Configuration Files
+- `CMakeLists.txt` - Build configuration
+- `docker-compose.yml` - AI services configuration
+- `ollama_setup.sh` - Ollama startup script
+- `src/config.h` - System prompt and configuration
+
+## Notes
+1. The project uses **coroutines** extensively (C++20 feature)
+2. **Telegram authentication** will be interactive on first run
+3. **AI services** must be running before the application starts
+4. **Memory/diary data** is stored in the `data/` directory (created at runtime)

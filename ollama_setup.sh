@@ -10,8 +10,8 @@ pid=$!
 sleep 5
 
 echo "🔴 Retrieve LLAMA3 model..."
-#ollama pull gemma3:27b
-#ollama pull gpt-oss:20b
+ollama pull qwen3-embedding
+ollama pull qwen3.5:9b
 echo "🟢 Done!"
 
 # Wait for Ollama process to finish.
