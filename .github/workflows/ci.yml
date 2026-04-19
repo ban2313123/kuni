@@ -22,8 +22,7 @@ jobs:
             build-essential \
             ninja-build \
             curl \
-            ccache \
-            g++-14
+            ccache
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
@@ -51,9 +50,6 @@ jobs:
           EOF
 
       - name: Configure CMake
-        env:
-          CC: gcc-14
-          CXX: g++-14
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build project
