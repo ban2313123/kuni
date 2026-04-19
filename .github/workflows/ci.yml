@@ -23,11 +23,11 @@ jobs:
             ninja-build \
             curl
 
-      - name: Download AUI Boot script
+      - name: Download latest AUI Boot script (master)
         run: |
           mkdir -p build
           curl -L -o build/aui.boot.cmake \
-            https://raw.githubusercontent.com/aui-framework/aui/b5186aaf5f78ad6756c04aad3992ac8d3a07d319/aui.boot.cmake
+            https://raw.githubusercontent.com/aui-framework/aui/master/aui.boot.cmake
 
       - name: Create dummy secrets.h
         run: |
