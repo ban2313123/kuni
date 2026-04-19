@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 project(kuni VERSION 1.0.0)
 
 option(BUILD_SHARED_LIBS OFF)
-
-set(AUI_VERSION b5186aaf5f78ad6756c04aad3992ac8d3a07d319)
+set(AUI_VERSION ffd8367bed9bb64b2e9e48a866e592ba34934de2)
 
 # Use AUI.Boot
 #file(
