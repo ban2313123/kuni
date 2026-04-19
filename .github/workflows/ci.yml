@@ -1,4 +1,4 @@
-name: CI Build (CMake + AUI)
+name: CI Build (CMake + AUI + Cache + Artifacts)
 
 on:
   push:
@@ -21,9 +21,18 @@ jobs:
             cmake \
             build-essential \
             ninja-build \
-            curl
+            curl \
+            ccache \
+            g++-14
 
-      - name: Download latest AUI Boot script (master)
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Download latest AUI Boot script
         run: |
           mkdir -p build
           curl -L -o build/aui.boot.cmake \
@@ -42,7 +51,10 @@ jobs:
           EOF
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build project
         run: cmake --build build --config Release
@@ -53,3 +65,12 @@ jobs:
       - name: Run tests
         working-directory: build
         run: ctest --output-on-failure
+
+      - name: Upload kuni binary
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: kuni-linux-x64
+          path: build/kuni
+          if-no-files-found: error
+          retention-days: 30
