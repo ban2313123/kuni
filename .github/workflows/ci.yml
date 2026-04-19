@@ -1,4 +1,4 @@
-name: CI Build (CMake)
+name: CI Build (CMake + AUI)
 
 on:
   push:
@@ -20,8 +20,14 @@ jobs:
           sudo apt-get install -y \
             cmake \
             build-essential \
-            git \
-            ninja-build
+            ninja-build \
+            curl
+
+      - name: Download AUI Boot script
+        run: |
+          mkdir -p build
+          curl -L -o build/aui.boot.cmake \
+            https://raw.githubusercontent.com/aui-framework/aui/b5186aaf5f78ad6756c04aad3992ac8d3a07d319/aui.boot.cmake
 
       - name: Create dummy secrets.h
         run: |
